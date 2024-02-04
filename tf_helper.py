@@ -8,7 +8,7 @@ loaded_model = models.load_model("speech.hdf5")
 
 def features_extractor(audio):
     # load the file (audio)
-    audio, sample_rate = librosa.load(file_name, res_type='fft')
+    audio, sample_rate = librosa.load(audio, res_type='fft')
     # extract mfcc
     mfccs_features = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=60)
     # in order to find out scaled feature we do the mean of transpose of value
