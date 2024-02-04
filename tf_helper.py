@@ -1,50 +1,35 @@
 import numpy as np
 import tensorflow as tf
+import librosa
+from tensorflow.keras import models  
 
 
-# Set the seed value for experiment reproducibility.
-seed = 42
-tf.random.set_seed(seed)
-np.random.seed(seed)
+loaded_model = models.load_model("speech.hdf5")
 
-def get_spectrogram(waveform):
-    # Zero-padding for an audio waveform with less than 16,000 samples.
-    input_len = 16000
-    waveform = waveform[:input_len]
-    zero_padding = tf.zeros(
-        [16000] - tf.shape(waveform),
-        dtype=tf.float32)
-    # Cast the waveform tensors' dtype to float32.
-    waveform = tf.cast(waveform, dtype=tf.float32)
-    # Concatenate the waveform with `zero_padding`, which ensures all audio
-    # clips are of the same length.
-    equal_length = tf.concat([waveform, zero_padding], 0)
-    # Convert the waveform to a spectrogram via a STFT.
-    spectrogram = tf.signal.stft(
-        equal_length, frame_length=255, frame_step=128)
-    # Obtain the magnitude of the STFT.
-    spectrogram = tf.abs(spectrogram)
-    # Add a `channels` dimension, so that the spectrogram can be used
-    # as image-like input data with convolution layers (which expect
-    # shape (`batch_size`, `height`, `width`, `channels`).
-    spectrogram = spectrogram[..., tf.newaxis]
-    return spectrogram
+def features_extractor(audio):
+    # load the file (audio)
+    audio, sample_rate = librosa.load(file_name, res_type='fft')
+    # extract mfcc
+    mfccs_features = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=60)
+    # in order to find out scaled feature we do the mean of transpose of value
+    mfccs_scaled_features = np.mean(mfccs_features.T, axis=0)
+    return mfccs_scaled_features
 
 
-def preprocess_audiobuffer(waveform):
-    """
-    waveform: ndarray of size (16000, )
-    
-    output: Spectogram Tensor of size: (1, `height`, `width`, `channels`)
-    """
-    #  normalize from [-32768, 32767] to [-1, 1]
-    waveform =  waveform / 32768
+def preprocess_and_predict(audio):
+    # Extract features from the audio
+    features = features_extractor(audio)
+    # Expand dimensions to match the input shape expected by the CNN model
+    features = np.expand_dims(features, axis=0)
 
-    waveform = tf.convert_to_tensor(waveform, dtype=tf.float32)
+    # Make prediction using the CNN model
+    predictions = loaded_model.predict(features)
 
-    spectogram = get_spectrogram(waveform)
-    
-    # add one dimension
-    spectogram = tf.expand_dims(spectogram, 0)
-    
-    return spectogram
+    # Get the predicted class label
+    predicted_class_index = np.argmax(predictions)
+
+    # Map the predicted index to the class label
+    class_labels = ['down', 'go', 'left', 'no', 'off', 'on', 'right', 'stop', 'up', 'yes']  # Replace with your actual class labels
+    predicted_class_label = class_labels[predicted_class_index]
+
+    return predicted_class_label
